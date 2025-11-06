@@ -1,0 +1,28 @@
+[
+  {
+    "id": "9340a716-4aac-461d-ad3b-3c0fcde9b891",
+    "title": "India-Tourism-Statistics-2020-Table-2.1.2.csv",
+    "content": "January 452236 440907 611702 -2.51 38.74\nFebruary 453298 402203 495109 -11.27 23.1\nMarch 504091 484602 287681 -3.87 -40.64\nApril 496531 507704 233 2.25 -99.95\nMay 529423 618600 25760 16.84 -95.84\nJune 723338 668724 180956 -7.55 -72.94\nJuly 774602 775580 284643 0.13 -63.3\nAugust 685513 673569 270669 -1.74 -59.82\nSeptember 448040 489514 274391 9.26 -43.95\nOctober 527386 624463 332214 18.41 -46.8\nNovember 588362 606876 406941 3.15 -32.94\nDecember 682624 690417 422057 1.14 -38.87\nTotal 6865444 6983159 3592356 1.71 -48.56",
+    "category": "CSV",
+    "created_date": "2025-11-02T14:22:29.151650+00:00",
+    "file_size": 597,
+    "word_count": 78,
+    "tags": [
+      "CSV",
+      "uploaded"
+    ]
+  },
+  {
+    "id": "45faa26f-7447-499b-babe-488ce2623b9c",
+    "title": "GATE 2026 CS SYLLABUS.pdf",
+    "content": "GATE 2026                                                                                         IIT Guwahati | Organizing  Institute         \n \n \nCS Computer Science and Information Technology                             \nSection  1: Engineering  Mathematics  \nDiscrete Mathematics:  Propositional and first order logic. Sets, relations, functions, partial orders and \nlattices. Monoids, Groups. Graphs: connectivity, matching, colouring. Combinatorics: counting, \nrecurrence relations, generating functions.  \nLinear Algebra: Matrices, determi nants, system of linear equations, eigenvalues and eigenvectors, LU \ndecomposition.  \nCalculus:  Limits, continuity and differentiability, Maxima and minima, Mean value theorem, \nIntegration.  \nProbability  and Statistics:  Random variables, Uniform, normal, exponential, Poisson and binomial  \ndistributions. Mean, median, mode and standard deviation. Conditional probability and Bayes theorem.  \nSection  2: Digital  Logic  \nBoolean algebra. Combinational and sequential circuits. Minimization. Number representations and  \ncomputer arithmetic (fixed and floating point).  \nSection  3: Computer  Organization  and Architecture  \nMachine instructions and addressing modes. ALU, data\u2010path and control unit. Instruction pipelining, \npipeline hazards. Memory hierarchy: cache, main memory an d secondary storage; I/O interface \n(interrupt and DMA mode).  \nSection  4: Programming  and Data  Structures  \nProgramming in C. Recursion. Arrays, stacks, queues, linked lists, trees, binary search trees, binary \nheaps, graphs.  \nSection  5: Algorithms  \nSearching, sorting, hashing. Asymptotic worst case time and space complexity. Algorithm design \ntechniques: greedy, dynamic programming and divide\u2010and\u2010conquer. Graph traversals, minimum \nspanning trees, shortest paths.  \nSection  6: Theory  of Computation  \nRegular expressions and finite automata. Context -free grammars and push -down automata. Regular  and \ncontext -free languages, pumping lemma. Turing machines and undecidability.  \nSection  7: Compiler  Design  \nLexical analysis, parsing, syntax -directed translation. Runtime  environments. Intermediate code \ngeneration. Local optimi zation, Data flow analyses: constant propagation, liveness analysis, common \nsub expression elimination.  \nSection  8: Operating  System  \nSystem calls, processes, threads, inter\u2010process communication, conc urrency and synchronization. \nDeadlock. CPU and I/O scheduling. Memory management and virtual memory. File systems.  \nSection  9: Databases  \nER\u2010model. Relational model: relational algebra, tuple calculus, SQL. Integrity constraints, normal \nforms. File organization, indexing (e.g., B and B+ trees). Transactions and concurrency control.  \n \nGATE 2026                                                                                         IIT Guwahati | Organizing  Institute         \n \n \nSection  10: Computer  Networks  \nConcept of layering: OSI and TCP/IP Protocol Stacks; Basics of packet, circuit and virtual circuit - \nswitching; Data link layer: framing, error detection, Medium Access Control, Ethernet bridging; \nRouting protocols: shortest path, flooding, distance vector and link state routing; Fragmentation and IP \naddressing, IPv4, CIDR notation, Basics of IP support protocols (ARP, DHCP, ICMP), Network \nAddress Translation (NAT); Transport layer: flow c ontrol and congestion control, UDP, TCP, sockets; \nApplication layer protocols: DNS, SMTP, HTTP, FTP, Email .",
+    "category": "PDF",
+    "created_date": "2025-11-02T14:24:05.522812+00:00",
+    "file_size": 548182,
+    "word_count": 396,
+    "tags": [
+      "PDF",
+      "uploaded"
+    ]
+  }
+]

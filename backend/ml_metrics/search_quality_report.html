@@ -1,0 +1,120 @@
+
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>IntelliDocs AI - Search Quality Report</title>
+            <style>
+                body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
+                .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                         color: white; padding: 30px; border-radius: 10px; margin-bottom: 30px; }
+                .metric-card { background: white; padding: 20px; margin: 20px 0; 
+                             border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+                .metric-value { font-size: 36px; font-weight: bold; color: #667eea; }
+                .metric-label { color: #666; margin-top: 10px; }
+                .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+                th { background: #667eea; color: white; }
+                .good { color: green; font-weight: bold; }
+                .average { color: orange; font-weight: bold; }
+                .poor { color: red; font-weight: bold; }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <h1>🔍 IntelliDocs AI - ML Search Quality Report</h1>
+                <p>Generated on: 2025-10-28 19:15:07</p>
+            </div>
+            
+            <div class="grid">
+                <div class="metric-card">
+                    <div class="metric-value">82.00%</div>
+                    <div class="metric-label">Precision</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">75.00%</div>
+                    <div class="metric-label">Recall</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">78.00%</div>
+                    <div class="metric-label">F1-Score</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">86.00%</div>
+                    <div class="metric-label">Accuracy</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">79.00%</div>
+                    <div class="metric-label">Mean Avg Precision</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">5</div>
+                    <div class="metric-label">Queries Evaluated</div>
+                </div>
+            </div>
+            
+            <div class="metric-card">
+                <h2>📊 Performance Analysis</h2>
+                <table>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Score</th>
+                        <th>Rating</th>
+                        <th>Interpretation</th>
+                    </tr>
+                    
+                <tr>
+                    <td>Precision</td>
+                    <td>0.820</td>
+                    <td class="good">GOOD</td>
+                    <td>Excellent - Very few irrelevant results</td>
+                </tr>
+                
+                <tr>
+                    <td>Recall</td>
+                    <td>0.750</td>
+                    <td class="good">GOOD</td>
+                    <td>Good - Finding many relevant documents</td>
+                </tr>
+                
+                <tr>
+                    <td>F1 Score</td>
+                    <td>0.780</td>
+                    <td class="good">GOOD</td>
+                    <td>Good balance overall</td>
+                </tr>
+                
+                <tr>
+                    <td>Accuracy</td>
+                    <td>0.860</td>
+                    <td class="good">GOOD</td>
+                    <td>Excellent overall performance</td>
+                </tr>
+                
+                <tr>
+                    <td>Map</td>
+                    <td>0.790</td>
+                    <td class="good">GOOD</td>
+                    <td>Good ranking quality</td>
+                </tr>
+                
+                </table>
+            </div>
+            
+            <div class="metric-card">
+                <h2>💡 Recommendations</h2>
+                <ul>
+                    <li>Model is performing well! Consider A/B testing for further improvements</li><li>Monitor performance over time to detect any degradation</li><li>Collect user feedback to continuously improve search relevance</li><li>Consider implementing query expansion for better coverage</li>
+                </ul>
+            </div>
+            
+            <div class="metric-card">
+                <h2>🎯 Model Configuration</h2>
+                <p><strong>Algorithm:</strong> BM25 + Random Forest Ranking</p>
+                <p><strong>Features:</strong> 10 query-document features</p>
+                <p><strong>Training Samples:</strong> 80</p>
+                <p><strong>Test Samples:</strong> 20</p>
+            </div>
+        </body>
+        </html>
+        
