@@ -1455,14 +1455,14 @@
       }
 
       async function openDocumentFromFolder(docId) {
-        const modal = document.getElementById("previewModal");
-        const modalBody = document.getElementById("modalBody");
-
-        // Check if we're in dark mode
-        const isDarkMode = document.body.classList.contains("dark-mode");
-
-        // First show loading state
-        modalBody.innerHTML = `
+  const modal = document.getElementById("previewModal");
+  const modalBody = document.getElementById("modalBody");
+  
+  // Check if we're in dark mode
+  const isDarkMode = document.body.classList.contains("dark-mode");
+  
+  // First show loading state
+  modalBody.innerHTML = `
     <div style="padding: 2rem; text-align: center;">
       <div style="width: 40px; height: 40px; border: 3px solid #ddd; 
           border-top: 3px solid var(--primary-color); border-radius: 50%; 
@@ -1470,106 +1470,107 @@
       <p style="margin-top: 1rem; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">Loading document...</p>
     </div>
   `;
-
-        modal.classList.add("show");
-        closeFolderModal();
-
-        try {
-          // Try to get full document through search API
-          const doc = allDocuments.find((d) => d.id === docId);
-          if (!doc) {
-            throw new Error("Document not found");
-          }
-
-          // Try to fetch full content using search API with document title
-          let fullContent = doc.content || doc.preview || "";
-
-          // If content seems truncated (less than expected), try to fetch via search
-          if (
-            fullContent &&
-            fullContent.length < 1000 &&
-            !fullContent.includes("...")
-          ) {
-            // Content seems complete, use it
-          } else if (doc.title) {
-            // Try to get full content via search
-            try {
-              const searchResponse = await fetch(`${API_URL}/api/search`, {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  query: doc.title,
-                  top: 1,
-                }),
-              });
-
-              if (searchResponse.ok) {
-                const searchData = await searchResponse.json();
-                if (searchData.results && searchData.results.length > 0) {
-                  const searchResult = searchData.results.find(
-                    (r) => r.id === docId
-                  );
-                  if (searchResult && searchResult.content) {
-                    fullContent = searchResult.content;
-                  }
-                }
-              }
-            } catch (searchError) {
-              console.log("Could not fetch via search:", searchError);
-            }
-          }
-
-          // If still no full content, show what we have
-          if (!fullContent) {
-            fullContent =
-              "Full content not available. The document may be empty or could not be loaded.";
-          }
-
-          // Calculate actual word count
-          const wordCount = fullContent
-            .split(/\s+/)
-            .filter((word) => word.length > 0).length;
-
-          // Now display the document with full content
-          modalBody.innerHTML = `
-      <div style="padding: 2rem; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
-        <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
-          <i class="fas ${getCategoryIcon(doc.category)}" style="color: var(--primary-color);"></i>
-          ${doc.title || "Untitled Document"}
-        </h3>
-        <div style="margin: 1rem 0;">
-          <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"};">
-            ${doc.category || "General"}
-          </span>
-          <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-            <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
-          </span>
-          <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-            <i class="fas fa-file-word"></i> ${wordCount} words
-          </span>
-          <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-            <i class="fas fa-file-archive"></i> ${fullContent.length} characters
-          </span>
+  
+  modal.classList.add("show");
+  closeFolderModal();
+  
+  try {
+    // Get document from allDocuments or fetch it
+    let doc = allDocuments.find((d) => d.id === docId);
+    
+    if (!doc) {
+      throw new Error("Document not found");
+    }
+    
+    // Get full content
+    let fullContent = doc.content || doc.preview || "";
+    
+    // If content seems incomplete, try to fetch from API
+    if (!fullContent || fullContent.length < 100) {
+      try {
+        const response = await fetch(`${API_URL}/api/documents/${docId}`);
+        if (response.ok) {
+          const fullDoc = await response.json();
+          fullContent = fullDoc.content || fullContent;
+          doc = { ...doc, ...fullDoc }; // Merge with full document data
+        }
+      } catch (fetchError) {
+        console.log("Could not fetch full document:", fetchError);
+      }
+    }
+    
+    // If still no content
+    if (!fullContent) {
+      fullContent = "Document content is empty or could not be loaded.";
+    }
+    
+    // Calculate word count
+    const wordCount = fullContent.split(/\s+/).filter(word => word.length > 0).length;
+    
+    // Set modal body with FIXED HEIGHT and proper scrolling
+    modalBody.style.height = "calc(80vh - 80px)";
+    modalBody.style.overflow = "hidden";
+    modalBody.style.display = "flex";
+    modalBody.style.flexDirection = "column";
+    
+    modalBody.innerHTML = `
+      <div style="
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        padding: 2rem;
+        color: ${isDarkMode ? "var(--dark-text)" : "#333"};
+      ">
+        <!-- Header Section (Fixed) -->
+        <div style="flex-shrink: 0;">
+          <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin: 0 0 1rem 0;">
+            <i class="fas ${getCategoryIcon(doc.category)}" style="color: var(--primary-color);"></i>
+            ${doc.title || "Untitled Document"}
+          </h3>
+          
+          <div style="margin-bottom: 1.5rem;">
+            <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"};">
+              ${doc.category || "General"}
+            </span>
+            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+              <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
+            </span>
+            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+              <i class="fas fa-file-word"></i> ${wordCount} words
+            </span>
+            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+              <i class="fas fa-file-archive"></i> ${fullContent.length} characters
+            </span>
+          </div>
         </div>
         
+        <!-- Content Section (Scrollable) -->
         <div style="
-          margin-top: 1.5rem; 
-          padding: 1.5rem; 
-          background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"}; 
+          flex: 1;
+          min-height: 0;
+          background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
           border-radius: 8px;
-          max-height: 450px;
-          overflow-y: auto;
           border: 1px solid ${isDarkMode ? "var(--dark-border)" : "#ddd"};
+          padding: 1.5rem;
+          overflow-y: auto;
+          overflow-x: hidden;
           position: relative;
         ">
-          <h4 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin-top: 0; margin-bottom: 1rem;">
+          <h4 style="
+            color: ${isDarkMode ? "var(--dark-text)" : "#333"}; 
+            margin: 0 0 1rem 0;
+            position: sticky;
+            top: 0;
+            background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
+            padding-bottom: 0.5rem;
+          ">
             Full Document Content:
           </h4>
+          
           <div style="
             white-space: pre-wrap; 
             word-wrap: break-word;
+            word-break: break-word;
             line-height: 1.8; 
             color: ${isDarkMode ? "var(--dark-text)" : "#333"};
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -1579,7 +1580,14 @@
           </div>
         </div>
         
-        <div style="margin-top: 1rem; display: flex; gap: 1rem; justify-content: space-between;">
+        <!-- Action Buttons (Fixed) -->
+        <div style="
+          flex-shrink: 0;
+          margin-top: 1rem;
+          display: flex;
+          gap: 1rem;
+          justify-content: space-between;
+        ">
           <div style="display: flex; gap: 1rem;">
             <button onclick="deleteDocument('${doc.id}')" style="
               padding: 0.75rem 1.25rem;
@@ -1591,8 +1599,9 @@
               font-weight: 500;
               transition: all 0.3s;
             " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-              <i class="fas fa-trash"></i> Delete Document
+              <i class="fas fa-trash"></i> Delete
             </button>
+            
             <button onclick="closeModal()" style="
               padding: 0.75rem 1.25rem;
               background: #6c757d;
@@ -1606,7 +1615,8 @@
               <i class="fas fa-times"></i> Close
             </button>
           </div>
-          <button onclick="copyToClipboard(\`${fullContent.replace(/`/g, "\\`").replace(/\\/g, "\\\\")}\`)" style="
+          
+          <button onclick="copyDocumentContent(\`${fullContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" style="
             padding: 0.75rem 1.25rem;
             background: var(--primary-color);
             color: white;
@@ -1621,9 +1631,11 @@
         </div>
       </div>
     `;
-        } catch (error) {
-          console.error("Error loading document:", error);
-          modalBody.innerHTML = `
+    
+  } catch (error) {
+    console.error("Error loading document:", error);
+    modalBody.style.height = "auto";
+    modalBody.innerHTML = `
       <div style="padding: 2rem; text-align: center; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
         <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
         <h3>Error Loading Document</h3>
@@ -1639,8 +1651,29 @@
         ">Close</button>
       </div>
     `;
-        }
-      }
+  }
+}
+
+function copyDocumentContent(text) {
+  navigator.clipboard.writeText(text).then(() => {
+    showToast("success", "Document content copied to clipboard!");
+  }).catch((err) => {
+    // Fallback for older browsers
+    const textArea = document.createElement("textarea");
+    textArea.value = text;
+    textArea.style.position = "fixed";
+    textArea.style.left = "-999999px";
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      showToast("success", "Document content copied to clipboard!");
+    } catch (err) {
+      showToast("error", "Failed to copy content");
+    }
+    document.body.removeChild(textArea);
+  });
+}
 
       function copyToClipboard(text) {
         navigator.clipboard
