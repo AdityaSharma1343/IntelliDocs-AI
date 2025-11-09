@@ -380,26 +380,15 @@ async def root():
 @app.post("/api/search", response_model=SearchResponse)
 async def search_documents_azure_primary(request: SearchRequest):
     try:
-        # Check if Azure search client is available
-        if not search_client:
-            if FALLBACK_TO_LOCAL:
-                return await search_local_fallback(request)
-            else:
-                raise HTTPException(
-                    status_code=503,
-                    detail="Azure Search not available and local fallback is disabled"
-                )
-            
         logger.info(f"🔍 Azure Search Query: {request.query}")
 
-        # Configure Azure search options
+        # Configure search options for Azure SDK
         search_options = {
             "search_text": request.query,
             "search_mode": request.search_mode,
             "include_total_count": True,
             "top": request.top,
-            "skip": request.skip,
-            "select": ["id", "title", "category", "created_date", "file_size", "word_count", "content", "tags"]
+            "skip": request.skip
         }
 
         if request.filter:
@@ -408,7 +397,6 @@ async def search_documents_azure_primary(request: SearchRequest):
         if request.orderby:
             search_options["order_by"] = request.orderby.split(",")
 
-        # Execute Azure search
         azure_results = search_client.search(**search_options)
 
         results = []
@@ -416,11 +404,9 @@ async def search_documents_azure_primary(request: SearchRequest):
             doc = {
                 "id": result.get("id"),
                 "title": result.get("title"),
-                "content": result.get("content", ""),  # Return FULL content
+                "content": result.get("content"),
                 "category": result.get("category"),
                 "created_date": result.get("created_date"),
-                "file_size": result.get("file_size"),
-                "word_count": result.get("word_count"),
                 "score": result.get("@search.score", 0),
                 "highlights": result.get("@search.highlights", {})
             }
@@ -447,57 +433,27 @@ async def search_documents_azure_primary(request: SearchRequest):
             )
 
 async def search_local_fallback(request: SearchRequest):
-    """
-    Local search fallback - only used when Azure is unavailable
-    """
     try:
-        # Load local documents
         if os.path.exists(DOCUMENTS_DB_FILE):
             with open(DOCUMENTS_DB_FILE, 'r', encoding='utf-8') as f:
                 documents = json.load(f)
         else:
             documents = []
 
-        # Convert search query to lowercase for case-insensitive search
         query_lower = request.query.lower()
         results = []
 
-        # Search through local documents
         for doc in documents:
-            title_match = query_lower in doc.get("title", "").lower()
-            content_match = query_lower in doc.get("content", "").lower()
-            
-            if title_match or content_match:
-                # Calculate a simple score
-                score = 2.0 if title_match else 1.0
-                
-                results.append({
-                    "id": doc.get("id"),
-                    "title": doc.get("title"),
-                    "content": doc.get("content", ""),  # Return FULL content
-                    "category": doc.get("category"),
-                    "created_date": doc.get("created_date"),
-                    "file_size": doc.get("file_size", 0),
-                    "word_count": doc.get("word_count", 0),
-                    "score": score,
-                    "highlights": {}
-                })
+            if query_lower in doc.get("title", "").lower() or \
+               query_lower in doc.get("content", "").lower():
+                results.append(doc)
 
-        # Sort by score
-        results.sort(key=lambda x: x["score"], reverse=True)
-
-        # Apply pagination
-        start = request.skip if request.skip else 0
-        end = start + request.top if request.top else len(results)
-        paginated_results = results[start:end]
-
-        logger.info(f"📁 Local search returned {len(paginated_results)} results")
+        results = results[:request.top] if request.top else results
 
         return SearchResponse(
             count=len(results),
-            results=paginated_results
+            results=results
         )
-        
     except Exception as e:
         logger.error(f"Local search failed: {e}")
         return SearchResponse(count=0, results=[])
@@ -508,88 +464,83 @@ async def upload_file_azure_primary(file: UploadFile = File(...)):
         if not file.filename:
             raise HTTPException(status_code=400, detail="No file provided")
 
-        # Save uploaded file
         file_path = UPLOAD_DIR / file.filename
         content = await file.read()
 
         with open(file_path, "wb") as buffer:
             buffer.write(content)
 
-        # Process document to extract text
-        doc_data = DocumentProcessor.process_document(str(file_path))
+        # Handle CSV manually
+        if file.filename.lower().endswith(".csv"):
+            import pandas as pd
+            try:
+                df = pd.read_csv(file_path)
+                text_content = "\n".join(
+                    df.astype(str).fillna("").apply(lambda row: " ".join(row), axis=1)
+                )
+                doc_data = {
+                    "filename": file.filename,
+                    "content": text_content,
+                    "doc_type": "CSV",  # ← Changed to uppercase
+                    "file_size": file_path.stat().st_size,
+                    "word_count": len(text_content.split())
+                }
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"Error reading CSV: {e}")
+        else:
+            doc_data = DocumentProcessor.process_document(str(file_path))
+            
+        # Ensure consistent category naming
+        category_map = {
+            'pdf': 'PDF',
+            'word': 'Word', 
+            'docx': 'Word',
+            'excel': 'Excel',
+            'xlsx': 'Excel',
+            'csv': 'CSV',
+            'powerpoint': 'PowerPoint',
+            'pptx': 'PowerPoint',
+            'text': 'Text',
+            'txt': 'Text'
+        }
         
-        # Generate unique ID and timestamp
+        doc_type = doc_data.get("doc_type", "unknown").lower()
+        category = category_map.get(doc_type, doc_data["doc_type"])
+        
         doc_id = str(uuid.uuid4())
         current_time = datetime.now(timezone.utc).isoformat()
 
-        # Get full content
-        full_content = doc_data["content"]
-        
-        # Create document object
         azure_document = {
             "id": doc_id,
             "title": doc_data["filename"],
-            "content": full_content,  # Full content
-            "category": doc_data["doc_type"],
+            "content": doc_data["content"][:32000],
+            "category": category,  # ← Using mapped category
             "created_date": current_time,
             "file_size": doc_data.get("file_size", 0),
             "word_count": doc_data.get("word_count", 0),
-            "tags": [doc_data["doc_type"], "uploaded"]
+            "tags": [category, "uploaded"]
         }
 
-        # Try to upload to Azure (PRIMARY)
-        upload_success = False
-        if search_client:
-            try:
-                # Azure free tier has 32KB limit per field
-                azure_doc_to_upload = azure_document.copy()
-                
-                # Check if content needs truncation for Azure
-                if len(azure_doc_to_upload["content"]) > 30000:
-                    azure_doc_to_upload["content"] = azure_doc_to_upload["content"][:30000]
-                    logger.info(f"Content truncated for Azure: {len(full_content)} -> 30000 chars")
-                
-                result = search_client.upload_documents(documents=[azure_doc_to_upload])
-                
-                if result[0].succeeded:
-                    logger.info(f"✅ Document uploaded to Azure: {doc_id}")
-                    upload_success = True
-                else:
-                    logger.error(f"Azure upload failed: {result[0].error}")
-                    
-            except Exception as e:
-                logger.error(f"Azure upload exception: {e}")
-
-        # Backup to local storage (with FULL content)
-        if FALLBACK_TO_LOCAL or not upload_success:
-            save_to_local_backup(azure_document)  # This saves FULL content locally
-
-        # Clean up uploaded file
-        try:
+        # Continue with Azure upload...
+        result = search_client.upload_documents(documents=[azure_document])
+        if result[0].succeeded:
+            logger.info(f"✅ Document uploaded to Azure: {doc_id}")
+            if FALLBACK_TO_LOCAL:
+                save_to_local_backup(azure_document)
             os.remove(file_path)
-        except Exception as e:
-            logger.warning(f"Could not delete temp file: {e}")
-
-        return {
-            "message": "Document indexed successfully",
-            "document_id": doc_id,
-            "filename": doc_data["filename"],
-            "category": doc_data["doc_type"],
-            "azure_indexed": upload_success,
-            "word_count": doc_data.get("word_count", 0),
-            "file_size": doc_data.get("file_size", 0),
-            "content_length": len(full_content)
-        }
-
+            return {
+                "message": "Document indexed in Azure Search successfully",
+                "document_id": doc_id,
+                "filename": doc_data["filename"],
+                "category": category,  # Return proper category
+                "azure_indexed": True,
+                "word_count": doc_data.get("word_count", 0)
+            }
+            
     except Exception as e:
         logger.error(f"Upload error: {str(e)}")
-        # Clean up file if it exists
-        if 'file_path' in locals() and os.path.exists(file_path):
-            try:
-                os.remove(file_path)
-            except:
-                pass
         raise HTTPException(status_code=500, detail=str(e))
+
 
 @app.get("/api/index/stats", response_model=IndexStats)
 async def get_index_statistics():
@@ -652,19 +603,19 @@ def save_to_local_backup(document: dict):
 
 @app.get("/api/documents/recent")
 async def get_recent_documents(limit: int = 10):
-    """Get recently uploaded documents with FULL content"""
+    """Get recently uploaded documents from Azure or local backup"""
     try:
         documents = []
         
-        # Try Azure first (PRIMARY)
+        # Try Azure first
         if search_client:
             try:
+                # Search for all documents, ordered by date
                 results = search_client.search(
                     search_text="*",
                     order_by=["created_date desc"],
                     top=limit,
-                    include_total_count=True,
-                    select=["id", "title", "category", "created_date", "file_size", "word_count", "content", "tags"]
+                    include_total_count=True
                 )
                 
                 for doc in results:
@@ -673,10 +624,8 @@ async def get_recent_documents(limit: int = 10):
                         "title": doc.get("title"),
                         "category": doc.get("category"),
                         "created_date": doc.get("created_date"),
-                        "file_size": doc.get("file_size"),
-                        "word_count": doc.get("word_count"),
-                        "content": doc.get("content", ""),  # Return FULL content
-                        "tags": doc.get("tags", [])
+                        "content": doc.get("content", "")[:200],  # Preview
+                        "preview": doc.get("content", "")[:100]
                     })
                     
             except Exception as e:
@@ -686,158 +635,15 @@ async def get_recent_documents(limit: int = 10):
         if not documents and os.path.exists(DOCUMENTS_DB_FILE):
             with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
                 local_docs = json.load(f)
-            
-            local_docs = sorted(
-                local_docs, 
-                key=lambda x: x.get("created_date", ""), 
-                reverse=True
-            )[:limit]
-            
-            for doc in local_docs:
-                documents.append({
-                    "id": doc.get("id"),
-                    "title": doc.get("title"),
-                    "category": doc.get("category"),
-                    "created_date": doc.get("created_date"),
-                    "file_size": doc.get("file_size"),
-                    "word_count": doc.get("word_count"),
-                    "content": doc.get("content", ""),  # Return FULL content
-                    "tags": doc.get("tags", [])
-                })
+            local_docs = sorted(local_docs, key=lambda x: x.get("created_date", ""), reverse=True)
+            documents = local_docs[:limit]
         
-        return {"documents": documents, "count": len(documents)}
+        return {"documents": documents}
         
     except Exception as e:
         logger.error(f"Error fetching recent documents: {e}")
         return {"documents": [], "error": str(e)}
-
-@app.get("/api/documents/{document_id}")
-async def get_document_by_id(document_id: str):
-    """Get a single document with full content by ID"""
-    try:
-        logger.info(f"📄 Fetching document: {document_id}")
-        document = None
-        
-        # Try to get from Azure first (PRIMARY)
-        if search_client:
-            try:
-                result = search_client.get_document(key=document_id)
-                if result:
-                    document = {
-                        "id": result.get("id"),
-                        "title": result.get("title"),
-                        "content": result.get("content", ""),  # Full content
-                        "category": result.get("category"),
-                        "created_date": result.get("created_date"),
-                        "file_size": result.get("file_size", 0),
-                        "word_count": result.get("word_count", 0),
-                        "tags": result.get("tags", [])
-                    }
-                    logger.info(f"✅ Found document in Azure: {document_id}")
-            except ResourceNotFoundError:
-                logger.warning(f"Document not found in Azure: {document_id}")
-            except Exception as e:
-                logger.warning(f"Azure fetch error: {e}")
-        
-        # Fallback to local backup if not found in Azure
-        if not document and os.path.exists(DOCUMENTS_DB_FILE):
-            logger.info(f"🔍 Searching local backup for: {document_id}")
-            try:
-                with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
-                    local_docs = json.load(f)
-                
-                for doc in local_docs:
-                    if doc.get("id") == document_id:
-                        document = {
-                            "id": doc.get("id"),
-                            "title": doc.get("title"),
-                            "content": doc.get("content", ""),  # Full content
-                            "category": doc.get("category"),
-                            "created_date": doc.get("created_date"),
-                            "file_size": doc.get("file_size", 0),
-                            "word_count": doc.get("word_count", 0),
-                            "tags": doc.get("tags", [])
-                        }
-                        logger.info(f"✅ Found document in local backup: {document_id}")
-                        break
-            except Exception as e:
-                logger.error(f"Error reading local backup: {e}")
-        
-        if document:
-            return document
-        else:
-            logger.error(f"❌ Document not found: {document_id}")
-            raise HTTPException(
-                status_code=404, 
-                detail=f"Document not found: {document_id}"
-            )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Error fetching document {document_id}: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error fetching document: {str(e)}"
-        )
-
-
-@app.delete("/api/documents/{document_id}")
-async def delete_document_by_id(document_id: str):
-    """Delete a document from Azure Search and local backup"""
-    try:
-        logger.info(f"🗑️ Deleting document: {document_id}")
-        deleted_from_azure = False
-        deleted_from_local = False
-        
-        # Delete from Azure
-        if search_client:
-            try:
-                search_client.delete_documents(documents=[{"id": document_id}])
-                logger.info(f"✅ Deleted from Azure: {document_id}")
-                deleted_from_azure = True
-            except Exception as e:
-                logger.warning(f"Azure delete issue: {e}")
-        
-        # Delete from local backup
-        if os.path.exists(DOCUMENTS_DB_FILE):
-            try:
-                with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
-                    docs = json.load(f)
-                
-                original_count = len(docs)
-                docs = [d for d in docs if d.get("id") != document_id]
-                
-                if len(docs) < original_count:
-                    with open(DOCUMENTS_DB_FILE, "w", encoding="utf-8") as f:
-                        json.dump(docs, f, indent=2)
-                    deleted_from_local = True
-                    logger.info(f"✅ Deleted from local: {document_id}")
-            except Exception as e:
-                logger.error(f"Local delete error: {e}")
-        
-        if deleted_from_azure or deleted_from_local:
-            return {
-                "message": "Document deleted successfully",
-                "document_id": document_id,
-                "azure_deleted": deleted_from_azure,
-                "local_deleted": deleted_from_local
-            }
-        else:
-            raise HTTPException(
-                status_code=404, 
-                detail="Document not found in Azure or local storage"
-            )
-            
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"❌ Delete error: {e}")
-        raise HTTPException(
-            status_code=500, 
-            detail=f"Error deleting document: {str(e)}"
-        )
-
+    
 @app.delete("/api/documents/{document_id}")  # Fixed path
 async def delete_document(document_id: str):
     """Delete a document from Azure Search and local backup"""
@@ -961,3 +767,4 @@ if __name__ == "__main__":
     print("="*60 + "\n")
 
     uvicorn.run(app, host="0.0.0.0", port=8000, reload=True)
+ 
