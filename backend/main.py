@@ -712,12 +712,13 @@ async def get_recent_documents(limit: int = 10):
         return {"documents": [], "error": str(e)}
 
 @app.get("/api/documents/{document_id}")
-async def get_document(document_id: str):
-    """Get a single document with full content"""
+async def get_document_by_id(document_id: str):
+    """Get a single document with full content by ID"""
     try:
+        logger.info(f"📄 Fetching document: {document_id}")
         document = None
         
-        # Try to get from Azure first
+        # Try to get from Azure first (PRIMARY)
         if search_client:
             try:
                 result = search_client.get_document(key=document_id)
@@ -728,42 +729,114 @@ async def get_document(document_id: str):
                         "content": result.get("content", ""),  # Full content
                         "category": result.get("category"),
                         "created_date": result.get("created_date"),
-                        "file_size": result.get("file_size"),
-                        "word_count": result.get("word_count"),
+                        "file_size": result.get("file_size", 0),
+                        "word_count": result.get("word_count", 0),
                         "tags": result.get("tags", [])
                     }
+                    logger.info(f"✅ Found document in Azure: {document_id}")
+            except ResourceNotFoundError:
+                logger.warning(f"Document not found in Azure: {document_id}")
             except Exception as e:
-                logger.warning(f"Could not get document from Azure: {e}")
+                logger.warning(f"Azure fetch error: {e}")
         
-        # Fallback to local if not found in Azure
+        # Fallback to local backup if not found in Azure
         if not document and os.path.exists(DOCUMENTS_DB_FILE):
-            with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
-                local_docs = json.load(f)
-            
-            for doc in local_docs:
-                if doc.get("id") == document_id:
-                    document = {
-                        "id": doc.get("id"),
-                        "title": doc.get("title"),
-                        "content": doc.get("content", ""),  # Full content
-                        "category": doc.get("category"),
-                        "created_date": doc.get("created_date"),
-                        "file_size": doc.get("file_size"),
-                        "word_count": doc.get("word_count"),
-                        "tags": doc.get("tags", [])
-                    }
-                    break
+            logger.info(f"🔍 Searching local backup for: {document_id}")
+            try:
+                with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
+                    local_docs = json.load(f)
+                
+                for doc in local_docs:
+                    if doc.get("id") == document_id:
+                        document = {
+                            "id": doc.get("id"),
+                            "title": doc.get("title"),
+                            "content": doc.get("content", ""),  # Full content
+                            "category": doc.get("category"),
+                            "created_date": doc.get("created_date"),
+                            "file_size": doc.get("file_size", 0),
+                            "word_count": doc.get("word_count", 0),
+                            "tags": doc.get("tags", [])
+                        }
+                        logger.info(f"✅ Found document in local backup: {document_id}")
+                        break
+            except Exception as e:
+                logger.error(f"Error reading local backup: {e}")
         
         if document:
             return document
         else:
-            raise HTTPException(status_code=404, detail="Document not found")
+            logger.error(f"❌ Document not found: {document_id}")
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Document not found: {document_id}"
+            )
             
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error fetching document: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"❌ Error fetching document {document_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error fetching document: {str(e)}"
+        )
+
+
+@app.delete("/api/documents/{document_id}")
+async def delete_document_by_id(document_id: str):
+    """Delete a document from Azure Search and local backup"""
+    try:
+        logger.info(f"🗑️ Deleting document: {document_id}")
+        deleted_from_azure = False
+        deleted_from_local = False
+        
+        # Delete from Azure
+        if search_client:
+            try:
+                search_client.delete_documents(documents=[{"id": document_id}])
+                logger.info(f"✅ Deleted from Azure: {document_id}")
+                deleted_from_azure = True
+            except Exception as e:
+                logger.warning(f"Azure delete issue: {e}")
+        
+        # Delete from local backup
+        if os.path.exists(DOCUMENTS_DB_FILE):
+            try:
+                with open(DOCUMENTS_DB_FILE, "r", encoding="utf-8") as f:
+                    docs = json.load(f)
+                
+                original_count = len(docs)
+                docs = [d for d in docs if d.get("id") != document_id]
+                
+                if len(docs) < original_count:
+                    with open(DOCUMENTS_DB_FILE, "w", encoding="utf-8") as f:
+                        json.dump(docs, f, indent=2)
+                    deleted_from_local = True
+                    logger.info(f"✅ Deleted from local: {document_id}")
+            except Exception as e:
+                logger.error(f"Local delete error: {e}")
+        
+        if deleted_from_azure or deleted_from_local:
+            return {
+                "message": "Document deleted successfully",
+                "document_id": document_id,
+                "azure_deleted": deleted_from_azure,
+                "local_deleted": deleted_from_local
+            }
+        else:
+            raise HTTPException(
+                status_code=404, 
+                detail="Document not found in Azure or local storage"
+            )
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Delete error: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Error deleting document: {str(e)}"
+        )
 
 @app.delete("/api/documents/{document_id}")  # Fixed path
 async def delete_document(document_id: str):

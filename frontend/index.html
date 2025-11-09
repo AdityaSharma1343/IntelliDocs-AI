@@ -1455,14 +1455,14 @@
       }
 
       async function openDocumentFromFolder(docId) {
-  const modal = document.getElementById("previewModal");
-  const modalBody = document.getElementById("modalBody");
-  
-  // Check if we're in dark mode
-  const isDarkMode = document.body.classList.contains("dark-mode");
-  
-  // First show loading state
-  modalBody.innerHTML = `
+        const modal = document.getElementById("previewModal");
+        const modalBody = document.getElementById("modalBody");
+
+        // Check if we're in dark mode
+        const isDarkMode = document.body.classList.contains("dark-mode");
+
+        // Show loading state
+        modalBody.innerHTML = `
     <div style="padding: 2rem; text-align: center;">
       <div style="width: 40px; height: 40px; border: 3px solid #ddd; 
           border-top: 3px solid var(--primary-color); border-radius: 50%; 
@@ -1470,50 +1470,49 @@
       <p style="margin-top: 1rem; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">Loading document...</p>
     </div>
   `;
-  
-  modal.classList.add("show");
-  closeFolderModal();
-  
-  try {
-    // Get document from allDocuments or fetch it
-    let doc = allDocuments.find((d) => d.id === docId);
-    
-    if (!doc) {
-      throw new Error("Document not found");
-    }
-    
-    // Get full content
-    let fullContent = doc.content || doc.preview || "";
-    
-    // If content seems incomplete, try to fetch from API
-    if (!fullContent || fullContent.length < 100) {
-      try {
-        const response = await fetch(`${API_URL}/api/documents/${docId}`);
-        if (response.ok) {
-          const fullDoc = await response.json();
-          fullContent = fullDoc.content || fullContent;
-          doc = { ...doc, ...fullDoc }; // Merge with full document data
-        }
-      } catch (fetchError) {
-        console.log("Could not fetch full document:", fetchError);
-      }
-    }
-    
-    // If still no content
-    if (!fullContent) {
-      fullContent = "Document content is empty or could not be loaded.";
-    }
-    
-    // Calculate word count
-    const wordCount = fullContent.split(/\s+/).filter(word => word.length > 0).length;
-    
-    // Set modal body with FIXED HEIGHT and proper scrolling
-    modalBody.style.height = "calc(80vh - 80px)";
-    modalBody.style.overflow = "hidden";
-    modalBody.style.display = "flex";
-    modalBody.style.flexDirection = "column";
-    
-    modalBody.innerHTML = `
+
+        modal.classList.add("show");
+        closeFolderModal();
+
+        try {
+          console.log("Fetching document:", docId);
+          console.log("API URL:", `${API_URL}/api/documents/${docId}`);
+
+          // Fetch the full document from API
+          const response = await fetch(`${API_URL}/api/documents/${docId}`, {
+            method: "GET",
+            headers: {
+              "Content-Type": "application/json",
+            },
+          });
+
+          console.log("Response status:", response.status);
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Error response:", errorText);
+            throw new Error(`HTTP ${response.status}: ${errorText}`);
+          }
+
+          const doc = await response.json();
+          console.log("Document loaded:", doc.title);
+
+          // Get full content
+          const fullContent =
+            doc.content || "Document content is empty or could not be loaded.";
+
+          // Calculate word count
+          const wordCount = fullContent
+            .split(/\s+/)
+            .filter((word) => word.length > 0).length;
+
+          // Set modal body with proper scrolling
+          modalBody.style.height = "calc(80vh - 80px)";
+          modalBody.style.overflow = "hidden";
+          modalBody.style.display = "flex";
+          modalBody.style.flexDirection = "column";
+
+          modalBody.innerHTML = `
       <div style="
         display: flex;
         flex-direction: column;
@@ -1536,10 +1535,10 @@
               <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
             </span>
             <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-              <i class="fas fa-file-word"></i> ${wordCount} words
+              <i class="fas fa-file-word"></i> ${wordCount.toLocaleString()} words
             </span>
             <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-              <i class="fas fa-file-archive"></i> ${fullContent.length} characters
+              <i class="fas fa-file-archive"></i> ${fullContent.length.toLocaleString()} characters
             </span>
           </div>
         </div>
@@ -1554,7 +1553,6 @@
           padding: 1.5rem;
           overflow-y: auto;
           overflow-x: hidden;
-          position: relative;
         ">
           <h4 style="
             color: ${isDarkMode ? "var(--dark-text)" : "#333"}; 
@@ -1563,11 +1561,12 @@
             top: 0;
             background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
             padding-bottom: 0.5rem;
+            z-index: 1;
           ">
-            Full Document Content:
+            📄 Full Document Content:
           </h4>
           
-          <div style="
+          <div id="documentContent" style="
             white-space: pre-wrap; 
             word-wrap: break-word;
             word-break: break-word;
@@ -1575,9 +1574,7 @@
             color: ${isDarkMode ? "var(--dark-text)" : "#333"};
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             font-size: 14px;
-          ">
-            ${fullContent}
-          </div>
+          ">${fullContent}</div>
         </div>
         
         <!-- Action Buttons (Fixed) -->
@@ -1616,7 +1613,7 @@
             </button>
           </div>
           
-          <button onclick="copyDocumentContent(\`${fullContent.replace(/\\/g, '\\\\').replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`)" style="
+          <button onclick="copyFullDocumentContent()" style="
             padding: 0.75rem 1.25rem;
             background: var(--primary-color);
             color: white;
@@ -1631,49 +1628,83 @@
         </div>
       </div>
     `;
-    
-  } catch (error) {
-    console.error("Error loading document:", error);
-    modalBody.style.height = "auto";
-    modalBody.innerHTML = `
+        } catch (error) {
+          console.error("Error loading document:", error);
+          modalBody.style.height = "auto";
+          modalBody.innerHTML = `
       <div style="padding: 2rem; text-align: center; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
         <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
-        <h3>Error Loading Document</h3>
-        <p>${error.message}</p>
+        <h3>❌ Error Loading Document</h3>
+        <p style="color: ${isDarkMode ? "#aaa" : "#666"}; margin: 1rem 0;">
+          ${error.message}
+        </p>
+        <p style="font-size: 0.9rem; color: ${isDarkMode ? "#888" : "#999"};">
+          Document ID: ${docId}
+        </p>
         <button onclick="closeModal()" style="
-          margin-top: 1rem;
+          margin-top: 1.5rem;
           padding: 0.75rem 1.25rem;
           background: #6c757d;
           color: white;
           border: none;
           border-radius: 8px;
           cursor: pointer;
+          font-weight: 500;
         ">Close</button>
       </div>
     `;
-  }
-}
+        }
+      }
 
-function copyDocumentContent(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    showToast("success", "Document content copied to clipboard!");
-  }).catch((err) => {
-    // Fallback for older browsers
-    const textArea = document.createElement("textarea");
-    textArea.value = text;
-    textArea.style.position = "fixed";
-    textArea.style.left = "-999999px";
-    document.body.appendChild(textArea);
-    textArea.select();
-    try {
-      document.execCommand('copy');
-      showToast("success", "Document content copied to clipboard!");
-    } catch (err) {
-      showToast("error", "Failed to copy content");
-    }
-    document.body.removeChild(textArea);
-  });
-}
+      // Helper function to copy document content
+      function copyFullDocumentContent() {
+        const contentElement = document.getElementById("documentContent");
+        if (!contentElement) {
+          showToast("error", "No content to copy");
+          return;
+        }
+
+        const text = contentElement.textContent;
+
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard
+            .writeText(text)
+            .then(() => {
+              showToast("success", "✅ Document content copied to clipboard!");
+            })
+            .catch((err) => {
+              console.error("Clipboard error:", err);
+              fallbackCopy(text);
+            });
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        const textArea = document.createElement("textarea");
+        textArea.value = text;
+        textArea.style.position = "fixed";
+        textArea.style.left = "-999999px";
+        textArea.style.top = "-999999px";
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+
+        try {
+          const successful = document.execCommand("copy");
+          if (successful) {
+            showToast("success", "✅ Document content copied to clipboard!");
+          } else {
+            showToast("error", "Failed to copy content");
+          }
+        } catch (err) {
+          console.error("Fallback copy error:", err);
+          showToast("error", "Failed to copy content");
+        }
+
+        document.body.removeChild(textArea);
+      }
 
       function copyToClipboard(text) {
         navigator.clipboard
@@ -1837,7 +1868,7 @@ function copyDocumentContent(text) {
         }
       }
 
-      const Search = performSearch;  // Alias for the search button onclick
+      const Search = performSearch; // Alias for the search button onclick
 
       function applyFilterAndDisplay(query) {
         if (currentFilter === "all") {
