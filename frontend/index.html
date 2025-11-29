@@ -1453,12 +1453,10 @@
         modal.classList.add("show");
         closeFolderModal();
       }
-
       async function openDocumentFromFolder(docId) {
         const modal = document.getElementById("previewModal");
         const modalBody = document.getElementById("modalBody");
 
-        // Check if we're in dark mode
         const isDarkMode = document.body.classList.contains("dark-mode");
 
         // Show loading state
@@ -1475,116 +1473,85 @@
         closeFolderModal();
 
         try {
-          console.log("Fetching document:", docId);
-          console.log("API URL:", `${API_URL}/api/documents/${docId}`);
-
-          // Fetch the full document from API
           const response = await fetch(`${API_URL}/api/documents/${docId}`, {
             method: "GET",
-            headers: {
-              "Content-Type": "application/json",
-            },
+            headers: { "Content-Type": "application/json" },
           });
 
-          console.log("Response status:", response.status);
-
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error("Error response:", errorText);
-            throw new Error(`HTTP ${response.status}: ${errorText}`);
+            throw new Error(
+              `HTTP ${response.status}: ${await response.text()}`
+            );
           }
 
           const doc = await response.json();
-          console.log("Document loaded:", doc.title);
-
-          // Get full content
           const fullContent =
             doc.content || "Document content is empty or could not be loaded.";
-
-          // Calculate word count
           const wordCount = fullContent
             .split(/\s+/)
             .filter((word) => word.length > 0).length;
 
-          // Set modal body with proper scrolling
-          modalBody.style.height = "calc(80vh - 80px)";
-          modalBody.style.overflow = "hidden";
-          modalBody.style.display = "flex";
-          modalBody.style.flexDirection = "column";
+          // Reset modal body styles for proper layout
+          modalBody.style.height = "auto";
+          modalBody.style.maxHeight = "calc(80vh - 100px)";
+          modalBody.style.overflow = "auto";
+          modalBody.style.display = "block";
+          modalBody.style.padding = "0";
 
           modalBody.innerHTML = `
-      <div style="
-        display: flex;
-        flex-direction: column;
-        height: 100%;
-        padding: 2rem;
-        color: ${isDarkMode ? "var(--dark-text)" : "#333"};
-      ">
-        <!-- Header Section (Fixed) -->
-        <div style="flex-shrink: 0;">
-          <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin: 0 0 1rem 0;">
+      <div style="padding: 2rem; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
+        <!-- Header Section -->
+        <div style="margin-bottom: 1.5rem;">
+          <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin: 0 0 1rem 0; font-size: 1.5rem;">
             <i class="fas ${getCategoryIcon(doc.category)}" style="color: var(--primary-color);"></i>
             ${doc.title || "Untitled Document"}
           </h3>
           
-          <div style="margin-bottom: 1.5rem;">
-            <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"};">
+          <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+            <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"}; font-size: 0.9rem;">
               ${doc.category || "General"}
             </span>
-            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+            <span style="color: ${isDarkMode ? "#aaa" : "#666"}; font-size: 0.9rem;">
               <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
             </span>
-            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+            <span style="color: ${isDarkMode ? "#aaa" : "#666"}; font-size: 0.9rem;">
               <i class="fas fa-file-word"></i> ${wordCount.toLocaleString()} words
             </span>
-            <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
+            <span style="color: ${isDarkMode ? "#aaa" : "#666"}; font-size: 0.9rem;">
               <i class="fas fa-file-archive"></i> ${fullContent.length.toLocaleString()} characters
             </span>
           </div>
         </div>
         
-        <!-- Content Section (Scrollable) -->
+        <!-- Content Section with consistent styling -->
         <div style="
-          flex: 1;
-          min-height: 0;
+          margin-bottom: 1.5rem;
+          padding: 1.5rem;
           background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
           border-radius: 8px;
           border: 1px solid ${isDarkMode ? "var(--dark-border)" : "#ddd"};
-          padding: 1.5rem;
-          overflow-y: auto;
-          overflow-x: hidden;
         ">
           <h4 style="
             color: ${isDarkMode ? "var(--dark-text)" : "#333"}; 
             margin: 0 0 1rem 0;
-            position: sticky;
-            top: 0;
-            background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
-            padding-bottom: 0.5rem;
-            z-index: 1;
+            font-size: 1.1rem;
           ">
             📄 Full Document Content:
           </h4>
           
           <div id="documentContent" style="
-            white-space: pre-wrap; 
+            white-space: pre-wrap;
             word-wrap: break-word;
             word-break: break-word;
-            line-height: 1.8; 
+            line-height: 1.6;
             color: ${isDarkMode ? "var(--dark-text)" : "#333"};
+            font-size: 1rem;
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            font-size: 14px;
           ">${fullContent}</div>
         </div>
         
-        <!-- Action Buttons (Fixed) -->
-        <div style="
-          flex-shrink: 0;
-          margin-top: 1rem;
-          display: flex;
-          gap: 1rem;
-          justify-content: space-between;
-        ">
+        <!-- Action Buttons -->
+        <div style="display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap;">
           <div style="display: flex; gap: 1rem;">
             <button onclick="deleteDocument('${doc.id}')" style="
               padding: 0.75rem 1.25rem;
@@ -1630,26 +1597,14 @@
     `;
         } catch (error) {
           console.error("Error loading document:", error);
-          modalBody.style.height = "auto";
           modalBody.innerHTML = `
       <div style="padding: 2rem; text-align: center; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
         <i class="fas fa-exclamation-circle" style="font-size: 3rem; color: #dc3545; margin-bottom: 1rem;"></i>
         <h3>❌ Error Loading Document</h3>
-        <p style="color: ${isDarkMode ? "#aaa" : "#666"}; margin: 1rem 0;">
-          ${error.message}
-        </p>
-        <p style="font-size: 0.9rem; color: ${isDarkMode ? "#888" : "#999"};">
-          Document ID: ${docId}
-        </p>
+        <p style="color: ${isDarkMode ? "#aaa" : "#666"}; margin: 1rem 0;">${error.message}</p>
         <button onclick="closeModal()" style="
-          margin-top: 1.5rem;
-          padding: 0.75rem 1.25rem;
-          background: #6c757d;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 500;
+          margin-top: 1.5rem; padding: 0.75rem 1.25rem; background: #6c757d;
+          color: white; border: none; border-radius: 8px; cursor: pointer;
         ">Close</button>
       </div>
     `;
@@ -1933,70 +1888,106 @@
 
         const modal = document.getElementById("previewModal");
         const modalBody = document.getElementById("modalBody");
-
-        // Get full content
         const fullContent =
           doc.content || doc.preview || "Full content not available";
-
-        // Check if we're in dark mode
         const isDarkMode = document.body.classList.contains("dark-mode");
+        const wordCount = fullContent
+          .split(/\s+/)
+          .filter((word) => word.length > 0).length;
+
+        // Reset modal body styles for proper layout
+        modalBody.style.height = "auto";
+        modalBody.style.maxHeight = "calc(80vh - 100px)";
+        modalBody.style.overflow = "auto";
+        modalBody.style.display = "block";
+        modalBody.style.padding = "0";
 
         modalBody.innerHTML = `
     <div style="padding: 2rem; color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
-      <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"};">
-        <i class="fas ${getCategoryIcon(doc.category)}" style="color: var(--primary-color);"></i>
-        ${doc.title || "Untitled Document"}
-      </h3>
-      <div style="margin: 1rem 0;">
-        <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"};">
-          ${doc.category || "General"}
-        </span>
-        <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-          <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
-        </span>
-        <span style="margin-left: 1rem; color: ${isDarkMode ? "#aaa" : "#666"};">
-          <i class="fas fa-file-word"></i> ${doc.word_count || fullContent.split(" ").length} words
-        </span>
-      </div>
-      <div style="
-        margin-top: 1.5rem; 
-        padding: 1.5rem; 
-        background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"}; 
-        border-radius: 8px;
-        max-height: 400px;
-        overflow-y: auto;
-        border: 1px solid ${isDarkMode ? "var(--dark-border)" : "#ddd"};
-      ">
-        <h4 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin-top: 0;">Full Document Content:</h4>
-        <div style="
-          white-space: pre-wrap; 
-          line-height: 1.8; 
-          color: ${isDarkMode ? "var(--dark-text)" : "#333"};
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        ">
-          ${fullContent}
+      <!-- Header Section -->
+      <div style="margin-bottom: 1.5rem;">
+        <h3 style="color: ${isDarkMode ? "var(--dark-text)" : "#333"}; margin: 0 0 1rem 0; font-size: 1.5rem;">
+          <i class="fas ${getCategoryIcon(doc.category)}" style="color: var(--primary-color);"></i>
+          ${doc.title || "Untitled Document"}
+        </h3>
+        
+        <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem;">
+          <span style="padding: 0.25rem 0.75rem; background: ${isDarkMode ? "var(--dark-bg)" : "#f0f4f8"}; border-radius: 12px; color: ${isDarkMode ? "var(--dark-text)" : "#666"}; font-size: 0.9rem;">
+            ${doc.category || "General"}
+          </span>
+          <span style="color: ${isDarkMode ? "#aaa" : "#666"}; font-size: 0.9rem;">
+            <i class="fas fa-calendar"></i> ${formatDate(doc.created_date)}
+          </span>
+          <span style="color: ${isDarkMode ? "#aaa" : "#666"}; font-size: 0.9rem;">
+            <i class="fas fa-file-word"></i> ${wordCount.toLocaleString()} words
+          </span>
         </div>
       </div>
-      <div style="margin-top: 1rem; display: flex; gap: 1rem;">
-        <button onclick="deleteDocument('${doc.id}')" style="
-          padding: 0.5rem 1rem;
-          background: #dc3545;
+      
+      <!-- Content Section with consistent styling -->
+      <div style="
+        margin-bottom: 1.5rem;
+        padding: 1.5rem;
+        background: ${isDarkMode ? "var(--dark-bg)" : "#f8f9fa"};
+        border-radius: 8px;
+        border: 1px solid ${isDarkMode ? "var(--dark-border)" : "#ddd"};
+      ">
+        <h4 style="
+          color: ${isDarkMode ? "var(--dark-text)" : "#333"}; 
+          margin: 0 0 1rem 0;
+          font-size: 1.1rem;
+        ">
+          📄 Full Document Content:
+        </h4>
+        
+        <div id="documentContent" style="
+          white-space: pre-wrap;
+          word-wrap: break-word;
+          word-break: break-word;
+          line-height: 1.6;
+          color: ${isDarkMode ? "var(--dark-text)" : "#333"};
+          font-size: 1rem;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        ">${fullContent}</div>
+      </div>
+      
+      <!-- Action Buttons -->
+      <div style="display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap;">
+        <div style="display: flex; gap: 1rem;">
+          <button onclick="deleteDocument('${doc.id}')" style="
+            padding: 0.75rem 1.25rem;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+          ">
+            <i class="fas fa-trash"></i> Delete Document
+          </button>
+          <button onclick="closeModal()" style="
+            padding: 0.75rem 1.25rem;
+            background: #6c757d;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+          ">
+            <i class="fas fa-times"></i> Close
+          </button>
+        </div>
+        
+        <button onclick="copyFullDocumentContent()" style="
+          padding: 0.75rem 1.25rem;
+          background: var(--primary-color);
           color: white;
           border: none;
           border-radius: 8px;
           cursor: pointer;
+          font-weight: 500;
         ">
-          <i class="fas fa-trash"></i> Delete Document
-        </button>
-        <button onclick="closeModal()" style="
-          padding: 0.5rem 1rem;
-          background: #6c757d;
-          color: white;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-        ">
-          <i class="fas fa-times"></i> Close
+          <i class="fas fa-copy"></i> Copy Content
         </button>
       </div>
     </div>
@@ -2007,7 +1998,6 @@
           closeFolderModal();
         }
       }
-
       function toggleFilter(element, filter) {
         document.querySelectorAll(".filter-chip").forEach((chip) => {
           chip.classList.remove("active");

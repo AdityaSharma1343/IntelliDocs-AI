@@ -3,6 +3,7 @@ Document Processor for various file formats
 """
 
 import os
+import logging
 from typing import Dict, Any
 import PyPDF2
 from docx import Document
@@ -72,27 +73,42 @@ class DocumentProcessor:
             print(f"Error processing PPTX: {e}")
             return ""
     
+    # Replace the extract_text_from_excel function in your document_processor.py or main.py
+
     @staticmethod
     def extract_text_from_excel(file_path: str) -> str:
         """Extract text from Excel file"""
         try:
-            workbook = openpyxl.load_workbook(file_path, data_only=True)
+            import openpyxl
+            from openpyxl import load_workbook
+            
+            workbook = load_workbook(file_path, data_only=True)
             text = []
             
             for sheet_name in workbook.sheetnames:
                 sheet = workbook[sheet_name]
-                text.append(f"Sheet: {sheet_name}")
+                text.append(f"=== Sheet: {sheet_name} ===\n")
                 
+                # Get all rows with data
                 for row in sheet.iter_rows(values_only=True):
-                    row_text = " | ".join([str(cell) for cell in row if cell])
-                    if row_text:
+                    # Filter out None values and convert to string
+                    row_values = [str(cell) if cell is not None else "" for cell in row]
+                    # Only add row if it has any non-empty values
+                    if any(val.strip() for val in row_values):
+                        row_text = " | ".join(row_values)
                         text.append(row_text)
+                
+                text.append("\n")  # Add spacing between sheets
             
-            return "\n".join(text)
+            result = "\n".join(text)
+            return result if result.strip() else "No content could be extracted from Excel file"
+            
+        except ImportError:
+            return "Error: openpyxl library not installed. Install with: pip install openpyxl"
         except Exception as e:
-            print(f"Error processing Excel: {e}")
-            return ""
-    
+            logger.error(f"Error processing Excel: {e}")
+            return f"Error extracting text from Excel: {str(e)}"
+        
     @staticmethod
     def extract_text_from_txt(file_path: str) -> str:
         """Extract text from plain text file"""
