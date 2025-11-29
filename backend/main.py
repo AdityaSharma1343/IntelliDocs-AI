@@ -6,7 +6,6 @@ Institute Project Version (Patched for SemanticSettings + .env)
 import os
 import json
 import uuid
-import logging
 import sys
 import logging 
 from typing import List, Optional, Dict, Any
@@ -16,6 +15,22 @@ from pathlib import Path
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+# Import DocumentProcessor from separate file
+from document_processor import DocumentProcessor
+
+# Check if processors are available
+try:
+    import PyPDF2
+    from docx import Document as DocxDocument
+    from pptx import Presentation
+    import openpyxl
+    from openpyxl import load_workbook
+    PROCESSORS_AVAILABLE = True
+    logger.info("✅ All document processors available")
+except ImportError as e:
+    PROCESSORS_AVAILABLE = False
+    logger.warning(f"⚠️ Some processors missing: {e}")
 
 # ---------------------------
 # Load .env from project root
@@ -32,19 +47,6 @@ else:
 
 # Configure logging for Azure
 logging.basicConfig(level=logging.INFO, stream=sys.stdout)
-
-# ---------------------------
-# Document processing imports
-# ---------------------------
-try:
-    import PyPDF2
-    from docx import Document as DocxDocument
-    from pptx import Presentation
-    import openpyxl
-    PROCESSORS_AVAILABLE = True
-except ImportError:
-    PROCESSORS_AVAILABLE = False
-    print("⚠️ Install document processors: pip install PyPDF2 python-docx openpyxl python-pptx")
 
 # ---------------------------
 # Azure SDK imports (compat)
@@ -210,117 +212,6 @@ class IndexStats(BaseModel):
     storage_size: int
     index_name: str
     status: str
-
-# ---------------------------
-# Document processor
-# ---------------------------
-class DocumentProcessor:
-    """Process different document types and extract text"""
-
-    @staticmethod
-    def extract_text_from_pdf(file_path: str) -> str:
-        try:
-            text = ""
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                for page in pdf_reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-            return text.strip() or "No text content extracted from PDF"
-        except Exception as e:
-            logger.error(f"Error processing PDF: {e}")
-            return f"Error extracting text from PDF: {str(e)}"
-
-    @staticmethod
-    def extract_text_from_docx(file_path: str) -> str:
-        try:
-            doc = DocxDocument(file_path)
-            text = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text.append(paragraph.text)
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        if cell.text.strip():
-                            text.append(cell.text)
-            return "\n".join(text) or "No text content extracted"
-        except Exception as e:
-            logger.error(f"Error processing DOCX: {e}")
-            return f"Error extracting text from Word: {str(e)}"
-
-    # Replace the extract_text_from_excel function in your document_processor.py or main.py
-
-    @staticmethod
-    def extract_text_from_excel(file_path: str) -> str:
-        """Extract text from Excel file"""
-        try:
-            import openpyxl
-            from openpyxl import load_workbook
-            
-            workbook = load_workbook(file_path, data_only=True)
-            text = []
-            
-            for sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
-                text.append(f"=== Sheet: {sheet_name} ===\n")
-                
-                # Get all rows with data
-                for row in sheet.iter_rows(values_only=True):
-                    # Filter out None values and convert to string
-                    row_values = [str(cell) if cell is not None else "" for cell in row]
-                    # Only add row if it has any non-empty values
-                    if any(val.strip() for val in row_values):
-                        row_text = " | ".join(row_values)
-                        text.append(row_text)
-                
-                text.append("\n")  # Add spacing between sheets
-            
-            result = "\n".join(text)
-            return result if result.strip() else "No content could be extracted from Excel file"
-            
-        except ImportError:
-            return "Error: openpyxl library not installed. Install with: pip install openpyxl"
-        except Exception as e:
-            logger.error(f"Error processing Excel: {e}")
-            return f"Error extracting text from Excel: {str(e)}"
-
-    @staticmethod
-    def process_document(file_path: str) -> Dict[str, Any]:
-        file_extension = os.path.splitext(file_path)[1].lower()
-        filename = os.path.basename(file_path)
-
-        text = ""
-        doc_type = "unknown"
-
-        if file_extension == '.pdf':
-            text = DocumentProcessor.extract_text_from_pdf(file_path)
-            doc_type = "PDF"
-        elif file_extension in ['.docx', '.doc']:
-            text = DocumentProcessor.extract_text_from_docx(file_path)
-            doc_type = "Word"
-        elif file_extension in ['.xlsx', '.xls']:
-            text = DocumentProcessor.extract_text_from_excel(file_path)
-            doc_type = "Excel"
-        elif file_extension in ['.txt', '.text']:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    text = f.read()
-            except Exception as e:
-                logger.error(f"Error reading text file: {e}")
-                text = ""
-            doc_type = "Text"
-        else:
-            text = f"Unsupported file type: {file_extension}"
-
-        return {
-            "filename": filename,
-            "content": text,
-            "doc_type": doc_type,
-            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
-            "word_count": len(text.split()) if text else 0
-        }
 
 # ---------------------------
 # Index creation / update
@@ -1004,117 +895,6 @@ class IndexStats(BaseModel):
     storage_size: int
     index_name: str
     status: str
-
-# ---------------------------
-# Document processor
-# ---------------------------
-class DocumentProcessor:
-    """Process different document types and extract text"""
-
-    @staticmethod
-    def extract_text_from_pdf(file_path: str) -> str:
-        try:
-            text = ""
-            with open(file_path, 'rb') as file:
-                pdf_reader = PyPDF2.PdfReader(file)
-                for page in pdf_reader.pages:
-                    page_text = page.extract_text()
-                    if page_text:
-                        text += page_text + "\n"
-            return text.strip() or "No text content extracted from PDF"
-        except Exception as e:
-            logger.error(f"Error processing PDF: {e}")
-            return f"Error extracting text from PDF: {str(e)}"
-
-    @staticmethod
-    def extract_text_from_docx(file_path: str) -> str:
-        try:
-            doc = DocxDocument(file_path)
-            text = []
-            for paragraph in doc.paragraphs:
-                if paragraph.text.strip():
-                    text.append(paragraph.text)
-            for table in doc.tables:
-                for row in table.rows:
-                    for cell in row.cells:
-                        if cell.text.strip():
-                            text.append(cell.text)
-            return "\n".join(text) or "No text content extracted"
-        except Exception as e:
-            logger.error(f"Error processing DOCX: {e}")
-            return f"Error extracting text from Word: {str(e)}"
-
-   # Replace the extract_text_from_excel function in your document_processor.py or main.py
-
-    @staticmethod
-    def extract_text_from_excel(file_path: str) -> str:
-        """Extract text from Excel file"""
-        try:
-            import openpyxl
-            from openpyxl import load_workbook
-            
-            workbook = load_workbook(file_path, data_only=True)
-            text = []
-            
-            for sheet_name in workbook.sheetnames:
-                sheet = workbook[sheet_name]
-                text.append(f"=== Sheet: {sheet_name} ===\n")
-                
-                # Get all rows with data
-                for row in sheet.iter_rows(values_only=True):
-                    # Filter out None values and convert to string
-                    row_values = [str(cell) if cell is not None else "" for cell in row]
-                    # Only add row if it has any non-empty values
-                    if any(val.strip() for val in row_values):
-                        row_text = " | ".join(row_values)
-                        text.append(row_text)
-                
-                text.append("\n")  # Add spacing between sheets
-            
-            result = "\n".join(text)
-            return result if result.strip() else "No content could be extracted from Excel file"
-            
-        except ImportError:
-            return "Error: openpyxl library not installed. Install with: pip install openpyxl"
-        except Exception as e:
-            logger.error(f"Error processing Excel: {e}")
-            return f"Error extracting text from Excel: {str(e)}"
-
-    @staticmethod
-    def process_document(file_path: str) -> Dict[str, Any]:
-        file_extension = os.path.splitext(file_path)[1].lower()
-        filename = os.path.basename(file_path)
-
-        text = ""
-        doc_type = "unknown"
-
-        if file_extension == '.pdf':
-            text = DocumentProcessor.extract_text_from_pdf(file_path)
-            doc_type = "PDF"
-        elif file_extension in ['.docx', '.doc']:
-            text = DocumentProcessor.extract_text_from_docx(file_path)
-            doc_type = "Word"
-        elif file_extension in ['.xlsx', '.xls']:
-            text = DocumentProcessor.extract_text_from_excel(file_path)
-            doc_type = "Excel"
-        elif file_extension in ['.txt', '.text']:
-            try:
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    text = f.read()
-            except Exception as e:
-                logger.error(f"Error reading text file: {e}")
-                text = ""
-            doc_type = "Text"
-        else:
-            text = f"Unsupported file type: {file_extension}"
-
-        return {
-            "filename": filename,
-            "content": text,
-            "doc_type": doc_type,
-            "file_size": os.path.getsize(file_path) if os.path.exists(file_path) else 0,
-            "word_count": len(text.split()) if text else 0
-        }
 
 # ---------------------------
 # Index creation / update

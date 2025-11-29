@@ -75,7 +75,7 @@ IntelliDocs AI
 ### 1. Clone Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/intellidocs-ai.git
+git clone https://github.com/AdityaSharma1343/intellidocs-ai.git
 cd intellidocs-ai
 ```
 
