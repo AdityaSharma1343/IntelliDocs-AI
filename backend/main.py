@@ -14,7 +14,11 @@ from pathlib import Path
 
 from fastapi import FastAPI, File, UploadFile, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, File, UploadFile, HTTPException, status, Response
 from pydantic import BaseModel
+
+logging.basicConfig(level=logging.INFO, stream=sys.stdout)
+logger = logging.getLogger(__name__)
 
 # Import DocumentProcessor from separate file
 from document_processor import DocumentProcessor
@@ -142,22 +146,40 @@ DOCUMENTS_DB_FILE = "documents_db_backup.json"
 UPLOAD_DIR = Path("uploaded_files")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ---------------------------
-# Initialize FastAPI app
-# ---------------------------
 app = FastAPI(
     title="IntelliDocs AI - Azure AI Search Portal",
-    description="Intelligent document search powered by Azure AI Search (PRIMARY)",
+    description="Intelligent document search powered by Azure AI Search",
     version="3.0.0"
 )
 
+# CORS Configuration - UPDATED
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://salmon-wave-0b9bf3f1e3.azurestaticapps.net",  # Your frontend
+        "http://localhost:8080",
+        "http://localhost:5500",
+        "http://127.0.0.1:8080",
+        "http://127.0.0.1:5500",
+        "*"  # Allow all for development
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
+    max_age=3600,
 )
+
+# Additional CORS middleware to ensure headers are added
+@app.middleware("http")
+async def add_cors_headers(request, call_next):
+    """Add CORS headers to all responses"""
+    response = await call_next(request)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Credentials"] = "true"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS, PATCH"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
 
 # ---------------------------
 # Initialize Azure clients (PRIMARY)
@@ -255,6 +277,21 @@ async def create_or_update_index():
         else:
             logger.error(f"❌ Error creating index: {e}")
             raise
+
+# Handle preflight OPTIONS requests
+@app.options("/{full_path:path}")
+async def options_handler(full_path: str):
+    """Handle CORS preflight requests"""
+    return Response(
+        content="",
+        status_code=200,
+        headers={
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS, PATCH",
+            "Access-Control-Allow-Headers": "*",
+            "Access-Control-Max-Age": "3600",
+        }
+    )
 
 # ---------------------------
 # API endpoints
